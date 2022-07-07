@@ -2,6 +2,7 @@ from multiprocessing import Process, Manager
 from os import cpu_count
 
 import pandas as pd
+import numpy as np
 
 
 def cleaner(villages: list) -> list:
@@ -84,7 +85,7 @@ def mapper(villages: list, tokens: dict):
             print('done with:', i)
 
     print(f'Found: {len(found_village_index)}, Unmapped: {len(unmapped_village_index)}')
-    return found_village_index, found_tokens, unmapped_village_index, need_mapping
+    # return found_village_index, found_tokens, unmapped_village_index, need_mapping
 
 
 def write_to_ward_file(mapped_df: pd.DataFrame, unmapped_df: pd.DataFrame) -> None:
@@ -102,32 +103,44 @@ def write_to_village_file(mapped_df: pd.DataFrame, unmapped_df: pd.DataFrame) ->
 def manipulate_data(raw_villages, tokens):
     # manipulating data
     clean_villages = cleaner(raw_villages)
-    found_village_index, found_tokens, unmapped_village_index, need_mapping = mapper(clean_villages, tokens)
-    raw_clean_mapped_village_list = [(raw_villages[i], clean_villages[i]) for i in found_village_index]
-    raw_clean_unmapped_village_list = [(raw_villages[i], clean_villages[i]) for i in unmapped_village_index]
-    raw_mapped_villages, clean_mapped_villages = zip(*raw_clean_mapped_village_list)
-    raw_unmapped_villages, clean_unmapped_villages = zip(*raw_clean_unmapped_village_list)
+    # found_village_index, found_tokens, unmapped_village_index, need_mapping = mapper(clean_villages, tokens)
+    processes = []
+    num_processes = cpu_count()
+    print(num_processes)
+    with Manager() as ma:
+        found_tokens = ma.list()
+        found_village_index = ma.list()
+        
+        processes = []
+        slices = np.array_split(clean_villages, num_processes)
+        for i in range(num_processes):
+            p = Process(target=mapper, args=(slices[i], tokens,))
+            p.start()
+            processes.append(p)
+        
+        for p in processes:
+            p.join()
+        print(len(found_tokens))
+        raw_clean_mapped_village_list = [(raw_villages[i], clean_villages[i]) for i in found_village_index]
+        # raw_clean_unmapped_village_list = [(raw_villages[i], clean_villages[i]) for i in unmapped_village_index]
+        raw_mapped_villages, clean_mapped_villages = zip(*raw_clean_mapped_village_list)
+        # raw_unmapped_villages, clean_unmapped_villages = zip(*raw_clean_unmapped_village_list)
 
-    # creating dataframes
-    mapped_df = pd.DataFrame({
-        'raw_villages': raw_mapped_villages,
-        'clean_villages': clean_mapped_villages,
-        'tokens': found_tokens
-    })
-    unmapped_df = pd.DataFrame({
-        'raw_village': raw_unmapped_villages,
-        'clean_village': clean_unmapped_villages,
-        'need_mapping_for': need_mapping
-    })
+        # creating dataframes
+        mapped_df = pd.DataFrame({
+            'raw_villages': raw_mapped_villages,
+            'clean_villages': clean_mapped_villages,
+            'tokens': found_tokens
+        })
+        # unmapped_df = pd.DataFrame({
+        #     'raw_village': raw_unmapped_villages,
+        #     'clean_village': clean_unmapped_villages,
+        #     'need_mapping_for': need_mapping
+        # })
 
-    #write to file
-    return mapped_df, unmapped_df
+        #write to file
+        return mapped_df, unmapped_df
     # write_to_ward_file(mapped_df, unmapped_df)
-
-
-def split_list(v_list, num_processes):
-    k, m = divmod(len(v_list), num_processes)
-    return (v_list[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(num_processes))
 
 
 def main():
@@ -147,14 +160,10 @@ def main():
     raw_villages = df['village_raw'].tolist()
     # raw_villages = df['ward_raw'].tolist()
     
-    # processes = []
-    # # num_processes = cpu_count()
-    # num_processes = 2
-    # # manager = Manager()
-    #
+
     # process1 = Process(target=manipulate_data, args=(split_list(raw_villages, num_processes)[0], tokens))
     # process2 = Process(target=manipulate_data, args=(split_list(raw_villages, num_processes)[1], tokens))
-    # 
+
     # process1.start()
     # process2.start()
     # process1.join()
