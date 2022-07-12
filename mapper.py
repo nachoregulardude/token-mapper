@@ -1,10 +1,9 @@
-from multiprocessing import Process, Manager
-from os import cpu_count
+from time import perf_counter
 
 import pandas as pd
 
 
-def cleaner(villages: list) -> list:
+def cleaner(villages: list[str]) -> list[str]:
     count = 0
     clean_villages = []
     for v in villages:
@@ -16,98 +15,99 @@ def cleaner(villages: list) -> list:
             v = ', '.join(l).strip() if len(l) > 1 else l[0]
             count += 1
         clean_villages.append(v)
-    print(count, 'villages cleaned!')
+    print(count, 'raw representations cleaned!')
 
     return clean_villages
 
 
-def mapper(villages: list, tokens: dict):
+def mapper(villages: list[str]) -> tuple[list]:
     found_tokens: list[str] = []
     need_mapping: list[str] = []
     found_village_index: list[int] = []
     unmapped_village_index: list[int] = []
     got = False
+    added = True
     
     for i, v in enumerate(villages):
-        for token, mapping in tokens.items():
-            if v.strip() == token.strip():
-                found_tokens.append(mapping)
-                found_village_index.append(i)
-                break
-        else:
+        try:
+            found_tokens.append(TOKENS[v])
+            found_village_index.append(i)
+        
+        except KeyError:
             got = False
+            added = False
             got_token = []
             got_token_str = ""
             vs = []
-
             # sepearating each word
             vs = v.replace(',', "").split()
             vs = [split_word.strip() for split_word in vs if split_word.strip()]
             v_str = v
-
             # iterating over each word to see if they have a token
             for x in vs:
+                added = False
                 next_char = ""
-                for t, m in tokens.items():
-                    next_char = ""
-                    if x.strip() == t.strip():
-                        try:
-                            slice_index = v_str.index(x) + len(x)
-                            next_char = v_str[slice_index]
-                            v_str = v_str[slice_index:]
-                        except IndexError:
-                            next_char = ""
-                        got_token_str = f'{got_token_str}{m}{next_char}'
-                        match next_char:
-                            case " ":
-                                pass
-                            case ",":
-                                got_token_str = got_token_str + " "
-                        got_token.append(m)
-                        got = True
-                        break
-                    
-                else:
-                    if x not in need_mapping and not got:
+                try:
+                    mapping = TOKENS[x.strip()]
+                    got= True
+                    try:
+                        slice_index = v_str.index(x) + len(x)
+                        next_char = v_str[slice_index]
+                        v_str = v_str[slice_index:]
+                    except IndexError:
+                        next_char = ""
+                        
+                    got_token_str = f'{got_token_str}{mapping}{next_char}'
+                    match next_char:
+                        case " ":
+                            pass
+                        case ",":
+                            got_token_str = got_token_str + " "
+                except KeyError:
+                    if x not in need_mapping:
+                        added = True
                         need_mapping.append(x)
                         unmapped_village_index.append(i)
-
+            
             if got:
                 found_tokens.append(got_token_str.strip())
                 found_village_index.append(i)
-
-        if not got and v not in need_mapping:
+        
+        if not got and not added and v not in need_mapping:
             need_mapping.append(v)
             unmapped_village_index.append(i)
 
         if i % 1000 == 0:
             print('done with:', i)
-
     print(f'Found: {len(found_village_index)}, Unmapped: {len(unmapped_village_index)}')
+    
     return found_village_index, found_tokens, unmapped_village_index, need_mapping
 
 
 def write_to_ward_file(mapped_df: pd.DataFrame, unmapped_df: pd.DataFrame) -> None:
     mapped_df.to_csv('mapped_ward_check.csv', index=False)
     unmapped_df.to_csv('unmapped_ward_check.csv', index=False)
-    return
+    print('file created')
+    return None
 
     
 def write_to_village_file(mapped_df: pd.DataFrame, unmapped_df: pd.DataFrame) -> None:
-    mapped_df.to_csv('mapped_village_check.csv', index=False)
-    unmapped_df.to_csv('unmapped_village_check.csv', index=False)
+    mapped_df.to_csv('mapped_village_check_new.csv', index=False)
+    unmapped_df.to_csv('unmapped_village_check_new.csv', index=False)
+    print('file created')
+    return None
 
 
-
-def manipulate_data(raw_villages, tokens):
+def manipulate_data(raw_villages: list[str]) -> pd.DataFrame:
     # manipulating data
     clean_villages = cleaner(raw_villages)
-    found_village_index, found_tokens, unmapped_village_index, need_mapping = mapper(clean_villages, tokens)
+    found_village_index, found_tokens, unmapped_village_index, need_mapping = mapper(clean_villages)
+    print(f'{len(found_tokens)=}\n{len(found_village_index)=}\n{len(unmapped_village_index)=}\n{len(need_mapping)=}')
     raw_clean_mapped_village_list = [(raw_villages[i], clean_villages[i]) for i in found_village_index]
     raw_clean_unmapped_village_list = [(raw_villages[i], clean_villages[i]) for i in unmapped_village_index]
     raw_mapped_villages, clean_mapped_villages = zip(*raw_clean_mapped_village_list)
     raw_unmapped_villages, clean_unmapped_villages = zip(*raw_clean_unmapped_village_list)
-
+    
     # creating dataframes
     mapped_df = pd.DataFrame({
         'raw_villages': raw_mapped_villages,
@@ -120,14 +120,7 @@ def manipulate_data(raw_villages, tokens):
         'need_mapping_for': need_mapping
     })
 
-    #write to file
     return mapped_df, unmapped_df
-    # write_to_ward_file(mapped_df, unmapped_df)
-
-
-def split_list(v_list, num_processes):
-    k, m = divmod(len(v_list), num_processes)
-    return (v_list[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(num_processes))
 
 
 def main():
@@ -143,24 +136,15 @@ def main():
     og_reps.extend(v_tokens_df['og_representation'].tolist())
     mappings = tokens_df['mapping'].tolist()
     mappings.extend(v_tokens_df['mapping'].tolist())
-    tokens = dict(zip(og_reps, mappings, strict=True))
+    global TOKENS
+    TOKENS = {str(og).strip(): str(map).strip() for og, map in zip(og_reps, mappings)}
     raw_villages = df['village_raw'].tolist()
     # raw_villages = df['ward_raw'].tolist()
+    mapped_df, unmapped_df = manipulate_data(raw_villages)
     
-    # processes = []
-    # # num_processes = cpu_count()
-    # num_processes = 2
-    # # manager = Manager()
-    #
-    # process1 = Process(target=manipulate_data, args=(split_list(raw_villages, num_processes)[0], tokens))
-    # process2 = Process(target=manipulate_data, args=(split_list(raw_villages, num_processes)[1], tokens))
-    # 
-    # process1.start()
-    # process2.start()
-    # process1.join()
-    # process2.join()
-    # 
-    mapped_df, unmapped_df = manipulate_data(raw_villages, tokens)
-    # write_to_village_file(mapped_df, unmapped_df)
+    # write_to_ward_file(mapped_df, unmapped_df)
+    write_to_village_file(mapped_df, unmapped_df)
+
+    
 if __name__ == "__main__":
     main()
