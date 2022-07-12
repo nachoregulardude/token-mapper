@@ -26,7 +26,7 @@ def mapper(villages: list[str]) -> tuple[list]:
     found_village_index: list[int] = []
     unmapped_village_index: list[int] = []
     got = False
-    added = True
+    added = False
     
     for i, v in enumerate(villages):
         try:
