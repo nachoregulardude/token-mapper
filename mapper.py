@@ -34,6 +34,7 @@ def mapper(villages: list[str]) -> tuple[list]:
         try:
             found_tokens.append(TOKENS[v])
             found_village_index.append(i)
+            got = True
         
         except KeyError:
             got = False
@@ -95,7 +96,7 @@ def write_to_village_file(mapped_df: pd.DataFrame, unmapped_df: pd.DataFrame) ->
     return None
 
 
-def manipulate_data(raw_villages: list[str]) -> pd.DataFrame:
+def manipulate_data(raw_villages: list[str]) -> tuple[pd.DataFrame]:
     # manipulating data
     clean_villages = cleaner(raw_villages)
     found_village_index, found_tokens, unmapped_village_index, need_mapping = mapper(clean_villages)
@@ -107,7 +108,6 @@ def manipulate_data(raw_villages: list[str]) -> pd.DataFrame:
     raw_mapped_villages, clean_mapped_villages = zip(*raw_clean_mapped_village_list)
     raw_unmapped_villages, clean_unmapped_villages = zip(*raw_clean_unmapped_village_list)
     
-    print(len(set(clean_unmapped_villages)))
     # creating dataframes
     mapped_df = pd.DataFrame({
         'raw_villages': raw_mapped_villages,
@@ -132,16 +132,20 @@ def main() -> None:
     df = pd.read_csv(csvs[choice_unmapped])
     tokens_df = pd.read_csv(csvs[choice_tokens])
 
+    if ('og_representation' and 'mapping' not in list(tokens_df.columns)) or ('village_raw' not in list(df.columns)):
+        raise ValueError("check column names or the file chosen")
+        
     # loading in data from files
     og_reps = tokens_df['og_representation'].tolist()
     mappings = tokens_df['mapping'].tolist()
+    raw_villages = df['village_raw'].tolist()
     global TOKENS
     TOKENS = {str(og).strip(): str(map).strip() for og, map in zip(og_reps, mappings)}
-    raw_villages = df['village_raw'].tolist()
     # raw_villages = df['ward_raw'].tolist()
     mapped_df, unmapped_df = manipulate_data(raw_villages)
     # write_to_ward_file(mapped_df, unmapped_df)
-    write_to_village_file(mapped_df, unmapped_df)
+    # write_to_village_file(mapped_df, unmapped_df)
+    return None
 
     
 if __name__ == "__main__":
