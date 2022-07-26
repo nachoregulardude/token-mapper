@@ -125,8 +125,7 @@ def manipulate_data(raw_villages: list[str]) -> pd.DataFrame:
 
 def main() -> None:
     # Reading files
-    files = listdir()
-    csvs = [file for file in files if file.endswith('.csv')]
+    csvs = [file for file in listdir() if file.endswith('.csv')]
     _ = [print(f'{i}. {file}') for i, file in enumerate(csvs, 1)]
     choice_unmapped = int(input("Enter the index of the unmapped file: ")) - 1
     choice_tokens = int(input("Enter the index of the tokens file: ")) - 1
@@ -140,9 +139,7 @@ def main() -> None:
     TOKENS = {str(og).strip(): str(map).strip() for og, map in zip(og_reps, mappings)}
     raw_villages = df['village_raw'].tolist()
     # raw_villages = df['ward_raw'].tolist()
-    
     mapped_df, unmapped_df = manipulate_data(raw_villages)
-    
     # write_to_ward_file(mapped_df, unmapped_df)
     write_to_village_file(mapped_df, unmapped_df)
 
