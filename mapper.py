@@ -27,7 +27,6 @@ def add_space_before_and_after_special_chars(
     address: str, non_ascii_chars: list = []
 ):
     """
-        FYI - Not used yet
         Desc:
             Example input -> output : flat no: 1/2 -> flat no : 1 / 2
     """
@@ -50,7 +49,6 @@ def remove_space_before_and_after_special_chars(
     address: str, non_ascii_chars: list = []
 ):
     """
-        FYI - Not used yet
         Desc:
             Example input -> output : flat no: 1/2 -> flat no : 1 / 2
     """
