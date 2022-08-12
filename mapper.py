@@ -32,63 +32,24 @@ def add_remove_space_before_and_after_special_chars(
             
             
         Desc flag='remove':
-            Example input -> output : flat no: 1/2 -> flat no : 1 / 2
+            Example input -> output : flat no: 1 / 2 -> flat no : 1/2
     """
     special_chars_in_address = re.findall(
         r"\W", address.encode("ascii", errors="ignore").decode("ascii")
     )
-    
-    integers = re.findall(
-            r"\d", address.encode("ascii", errors="ignore").decode("ascii")
-            )
-    special_chars_in_address = special_chars_in_address + non_ascii_chars + integers + [':', '“']
+    if '.' in special_chars_in_address:
+        special_chars_in_address.remove('.')
+    special_chars_in_address = special_chars_in_address + non_ascii_chars
 
+    special_chars_in_address = list(dict.fromkeys(special_chars_in_address))
     for char in special_chars_in_address:
-        char = char.strip() if isinstance(char, str) else char
-        match flag:
-            case 'add':
-                if char:
-                    if char == '.':
-                        address = address.replace(f"{char}", f"{char} ")
-                    else:
-                        address = address.replace(f"{char}", f" {char} ")
+        char = char.strip()
+        if char:
+            address = address.replace(f"{char}", f" {char} ")
 
-            case 'remove':
-                if char:
-                    if char == '.':
-                        address = address.replace(f"{char} ", f"{char}")
-                    else: 
-                        address = address.replace(f" {char} ", f"{char}")
-            case other:
-                raise LookupError
     return address
 
-# def remove_space_before_and_after_special_chars(
-#     address: str, non_ascii_chars: list = []
-# ):
-#     """
-#         Desc:
-#             Example input -> output : flat no: 1/2 -> flat no : 1 / 2
-#     """
-#     special_chars_in_address = re.findall(
-#         r"\W", address.encode("ascii", errors="ignore").decode("ascii")
-#     )
-#     integers = re.findall(
-#             r"\d+", address.encode("ascii", errors="ignore").decode("ascii")
-#             )
-#     special_chars_in_address = special_chars_in_address + non_ascii_chars + integers
-#
-#     special_chars_in_address = list(dict.fromkeys(special_chars_in_address))
-#     
-#     for char in special_chars_in_address:
-#         char = char.strip() if isinstance(char, str) else char
-#         if char is not None:
-#             if char=='.':
-#                 address = address.replace(f"{char} ", f"{char}")
-#             else:
-#                 address = address.replace(f" {char} ", f"{char}")
-#     
-#     return address
+
 
 def mapper(villages: list[str]) -> tuple[list]:
     found_tokens: list[str] = []
